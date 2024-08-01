@@ -172,6 +172,7 @@ class CPU:
                 y = (opcode & 0x00F0) >> 0x4
                 n = opcode & 0x000F
                 did_pix_turn_off = False
+                self.V[0xF] = 0
                 for i in range(n):
                     for j in range(8):
                         spritePix = (self.memory[self.I + i] >> (7 - j)) & 0x1 #(self.memory[self.I + n] & 0x1 << j) >> j
