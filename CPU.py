@@ -22,8 +22,8 @@ class CPU:
         self.STACK = [0 for i in range(0x10)]  # Stack to hold PC values
         self.SP = 0x00  # Stack pointer
         self.OPCODE = 0x00
-        self.DT = 0x0000 # Delay timer
-        self.ST = 0x0000 # Sound timer
+        self.DT = 0x00  # Delay timer
+        self.ST = 0x00  # Sound timer
         self.ScreenBuffer = [0 for i in range(64 * 32)]
         self.CycleCount = 0
         self.LoadFonts()
@@ -138,16 +138,16 @@ class CPU:
                         self.V[x] = (self.V[x] - self.V[y]) & 0xFF
                     case 0x6:
                         print("8xy6, SHR")
-                        self.V[0xF] = self.V[x] & 0x1
-                        self.V[x] = self.V[x] >> 1
+                        self.V[0xF] = self.V[y] & 0x1
+                        self.V[x] = (self.V[y] >> 1) & 0xFF
                     case 0x7:
                         print("8xy7, SUBN")
                         self.V[0xF] = 1 if self.V[x] > self.V[y] else 0
                         self.V[x] = (self.V[y] - self.V[x]) & 0xFF
                     case 0xE:
                         print("SHL")
-                        self.V[0xF] = self.V[x] >> 0xF # Get MSB
-                        self.V[x] = self.V[x] << 1
+                        self.V[0xF] = self.V[y] >> 0xF  # Get MSB
+                        self.V[x] = (self.V[y] << 1) & 0xFF
                     case _: raise ValueError(f"Invalid opcode {opcode}")
             case opcodes._9xy0:
                 print("9xy0, SNE")
@@ -160,7 +160,7 @@ class CPU:
                 self.I = opcode & 0x0FFF
             case opcodes.Bnnn:
                 print("Bnnn, JP")
-                self.PC = self.V[0] + opcode & 0xFFF
+                self.PC = (opcode & 0xFFF) + self.V[0]
             case opcodes.Cxnn:
                 print("Cxnn, RND")
                 x = (opcode & 0x0F00) >> 8
@@ -171,12 +171,18 @@ class CPU:
                 x = (opcode & 0x0F00) >> 0x8
                 y = (opcode & 0x00F0) >> 0x4
                 n = opcode & 0x000F
+                did_pix_turn_off = False
                 for i in range(n):
                     for j in range(8):
                         spritePix = (self.memory[self.I + i] >> (7 - j)) & 0x1 #(self.memory[self.I + n] & 0x1 << j) >> j
                         screenIdx = self.V[x] + j + (self.V[y] + i) * 64
-                        self.V[0xF] = spritePix & self.ScreenBuffer[screenIdx]
+                        before = self.ScreenBuffer[screenIdx]
                         self.ScreenBuffer[screenIdx] ^= spritePix
+                        after = self.ScreenBuffer[screenIdx]
+                        if before == 1 and after == 0:
+                            did_pix_turn_off = True
+                if did_pix_turn_off:
+                    self.V[0xF] = 1
             case 0xE:
                 match opcode & 0xFF:
                     case opcodes.Ex9E:
@@ -212,10 +218,12 @@ class CPU:
                         self.memory[self.I] = num = num // 10
                     case opcodes.Fx55:
                         print("Fx55, LD [I], Vx")
-                        for i in range(x):
+                        for i in range(x + 1):
                             self.memory[self.I + i] = self.V[i]
+                        self.I += x + 1
                     case opcodes.Fx65:
                         print("Fx65, LD Vx, [I]")
-                        for i in range(x):
+                        for i in range(x + 1):
                             self.V[i] = self.memory[self.I + i]
+                        self.I += x + 1
                     case _: raise ValueError(f"Invalid opcode {opcode}")
